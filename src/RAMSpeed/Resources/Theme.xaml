@@ -1,0 +1,34 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        Minimal theme: data visualization accents only.
+        Text colors come from WPF-UI's theme system (auto dark/light).
+        Control chrome is handled by WPF-UI's ControlsDictionary.
+    -->
+
+    <!-- Data Accent Colors (saturated enough for both light and dark backgrounds) -->
+    <SolidColorBrush x:Key="UsageGreenBrush"  Color="#FF2E8B57"/>
+    <SolidColorBrush x:Key="UsageAmberBrush"  Color="#FFCC7A00"/>
+    <SolidColorBrush x:Key="UsageRedBrush"    Color="#FFCC3333"/>
+    <SolidColorBrush x:Key="GraphBlueBrush"   Color="#FF3574B0"/>
+
+    <!-- Graph Fill Brush -->
+    <LinearGradientBrush x:Key="GraphFillBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#303574B0" Offset="0"/>
+        <GradientStop Color="#083574B0" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Stat grid text styles (use WPF-UI theme-aware text colors) -->
+    <Style x:Key="StatLabel" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+        <Setter Property="FontSize" Value="11"/>
+    </Style>
+
+    <Style x:Key="StatValue" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+    </Style>
+
+</ResourceDictionary>

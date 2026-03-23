@@ -1,0 +1,15 @@
+# build output
+/target
+bin/
+obj/
+publish/
+dist/
+
+# ide
+.vs/
+*.user
+*.suo
+
+# os
+Thumbs.db
+Desktop.ini
