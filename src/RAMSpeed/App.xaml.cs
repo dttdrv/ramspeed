@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Windows;
 using Microsoft.Win32;
@@ -58,8 +59,10 @@ public partial class App : Application
             return;
         }
 
-        // Single-instance enforcement
-        _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out bool createdNew);
+        // Single-instance enforcement — use a security descriptor that allows
+        // both elevated and non-elevated processes to see the same mutex/event,
+        // preventing duplicate instances across integrity levels.
+        _singleInstanceMutex = CreateCrossIntegrityMutex(SingleInstanceMutexName, out bool createdNew);
         if (!createdNew)
         {
             var activated = SingleInstanceActivationService.SignalExistingInstance(ActivationSignalName)
@@ -78,15 +81,14 @@ public partial class App : Application
 
         _activationService = new SingleInstanceActivationService(ActivationSignalName, OnActivationSignal);
 
-        // Admin check — skip dialog during dev, go straight to read-only mode
-        if (!IsRunningAsAdmin() && false) // TODO: restore admin check
+        // Admin check — try silent elevation via scheduled task, then UAC, then read-only
+        if (!IsRunningAsAdmin())
         {
-            _singleInstanceMutex?.ReleaseMutex();
-            _singleInstanceMutex?.Dispose();
-            _singleInstanceMutex = null;
-
+            // Try the scheduled task first (silent elevation, no UAC prompt)
             if (TaskSchedulerHelper.TaskExists() && TaskSchedulerHelper.RunTask())
             {
+                // Give the elevated instance a moment to start before we release the mutex
+                Thread.Sleep(500);
                 Shutdown();
                 return;
             }
@@ -108,7 +110,7 @@ public partial class App : Application
                         UseShellExecute = true
                     });
                 }
-                catch { /* User cancelled UAC */ }
+                catch { /* User cancelled UAC or process start failed */ }
                 Shutdown();
                 return;
             }
@@ -119,16 +121,8 @@ public partial class App : Application
                 return;
             }
 
-            // User chose "No" — continue in read-only mode
+            // User chose "No" — continue in read-only mode (keep existing mutex)
             IsReadOnlyMode = true;
-
-            // Re-acquire mutex for single-instance
-            _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out bool ownsMutex);
-            if (!ownsMutex)
-            {
-                Shutdown();
-                return;
-            }
         }
 
         // Apply Windows 11 theme and accent color
@@ -211,6 +205,28 @@ public partial class App : Application
         using var identity = WindowsIdentity.GetCurrent();
         var principal = new WindowsPrincipal(identity);
         return principal.IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    /// <summary>
+    /// Create a named mutex accessible by both elevated and non-elevated processes.
+    /// Without explicit security, an elevated mutex is invisible to non-elevated processes,
+    /// causing duplicate instances when the app is launched via Task Scheduler (elevated)
+    /// and the user double-clicks the EXE (non-elevated).
+    /// </summary>
+    private static Mutex CreateCrossIntegrityMutex(string name, out bool createdNew)
+    {
+        var security = new MutexSecurity();
+        // Allow Everyone to synchronize (detect the mutex) and modify (release it)
+        security.AddAccessRule(new MutexAccessRule(
+            new SecurityIdentifier(WellKnownSidType.WorldSid, null),
+            MutexRights.Synchronize | MutexRights.Modify,
+            AccessControlType.Allow));
+        // Grant full control to the current user
+        security.AddAccessRule(new MutexAccessRule(
+            WindowsIdentity.GetCurrent().User!,
+            MutexRights.FullControl,
+            AccessControlType.Allow));
+        return MutexAcl.Create(true, name, out createdNew, security);
     }
 }
 

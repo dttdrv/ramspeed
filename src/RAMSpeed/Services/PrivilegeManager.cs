@@ -1,9 +1,12 @@
+using System.Runtime.InteropServices;
 using RAMSpeed.Native;
 
 namespace RAMSpeed.Services;
 
 internal static class PrivilegeManager
 {
+    private const int ERROR_NOT_ALL_ASSIGNED = 1300;
+
     public static bool EnablePrivilege(string privilegeName)
     {
         if (!NativeMethods.OpenProcessToken(
@@ -28,7 +31,12 @@ internal static class PrivilegeManager
                 }
             };
 
-            return NativeMethods.AdjustTokenPrivileges(tokenHandle, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+            if (!NativeMethods.AdjustTokenPrivileges(tokenHandle, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero))
+                return false;
+
+            // AdjustTokenPrivileges returns true even when it fails to assign all privileges.
+            // Must check GetLastWin32Error for ERROR_NOT_ALL_ASSIGNED.
+            return Marshal.GetLastWin32Error() != ERROR_NOT_ALL_ASSIGNED;
         }
         finally
         {
@@ -36,10 +44,14 @@ internal static class PrivilegeManager
         }
     }
 
-    public static void EnableAllRequired()
+    /// <summary>
+    /// Enable all required privileges. Returns true only if ALL privileges were enabled.
+    /// </summary>
+    public static bool EnableAllRequired()
     {
-        EnablePrivilege(NativeMethods.SE_DEBUG_NAME);
-        EnablePrivilege(NativeMethods.SE_PROFILE_SINGLE_PROCESS_NAME);
-        EnablePrivilege(NativeMethods.SE_INCREASE_QUOTA_NAME);
+        bool debug = EnablePrivilege(NativeMethods.SE_DEBUG_NAME);
+        bool profile = EnablePrivilege(NativeMethods.SE_PROFILE_SINGLE_PROCESS_NAME);
+        bool quota = EnablePrivilege(NativeMethods.SE_INCREASE_QUOTA_NAME);
+        return debug && profile && quota;
     }
 }

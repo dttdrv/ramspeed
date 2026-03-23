@@ -100,8 +100,18 @@ public class MainViewModel : ViewModelBase
         Monitor.MemoryUpdated += OnMemoryUpdated;
         Monitor.OptimizationCompleted += OnOptimizationCompleted;
 
-        try { PrivilegeManager.EnableAllRequired(); } catch { }
-        try { Monitor.Start(CheckIntervalSeconds); } catch { }
+        try
+        {
+            if (!PrivilegeManager.EnableAllRequired() && !IsReadOnlyMode)
+                StatusText = "Warning: some privileges could not be enabled — optimization may be limited";
+        }
+        catch { }
+
+        try { Monitor.Start(CheckIntervalSeconds); }
+        catch (Exception ex)
+        {
+            StatusText = $"Monitor failed to start: {ex.Message}";
+        }
     }
 
     // ── Bound Properties ──
@@ -385,17 +395,24 @@ public class MainViewModel : ViewModelBase
         IsOptimizing = true;
         StatusText = "Optimizing...";
 
-        // Run on background thread to keep UI responsive
-        Task.Run(() =>
+        // Run on background thread to keep UI responsive.
+        // Use ContinueWith to ensure IsOptimizing is always reset, even on failure.
+        Task.Run(() => Monitor.RunOptimization()).ContinueWith(task =>
         {
-            var result = Monitor.RunOptimization();
             Application.Current?.Dispatcher.Invoke(() =>
             {
                 IsOptimizing = false;
-                if (result.Success)
-                    StatusText = $"Freed {result.FreedMB:F1} MB in {result.Duration.TotalMilliseconds:F0}ms";
-                else
-                    StatusText = $"Optimization failed: {result.ErrorMessage}";
+
+                if (task.IsFaulted)
+                {
+                    StatusText = $"Optimization failed: {task.Exception?.InnerException?.Message ?? "unknown error"}";
+                    return;
+                }
+
+                var result = task.Result;
+                StatusText = result.Success
+                    ? $"Freed {result.FreedMB:F1} MB in {result.Duration.TotalMilliseconds:F0}ms"
+                    : $"Optimization failed: {result.ErrorMessage}";
 
                 // Show result notification
                 LastOptimizationResult = result;
@@ -407,7 +424,7 @@ public class MainViewModel : ViewModelBase
                     Application.Current?.Dispatcher.Invoke(() => ShowOptimizationResult = false);
                 _resultDismissTimer.Start();
             });
-        });
+        }, TaskScheduler.Default);
     }
 
     private void ToggleAutoOptimize()

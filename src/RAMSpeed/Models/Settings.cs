@@ -64,12 +64,14 @@ public class Settings
             if (File.Exists(SettingsFile))
             {
                 var json = File.ReadAllText(SettingsFile);
-                return JsonSerializer.Deserialize<Settings>(json, JsonOptions) ?? new Settings();
+                var settings = JsonSerializer.Deserialize<Settings>(json, JsonOptions) ?? new Settings();
+                settings.Validate();
+                return settings;
             }
         }
         catch
         {
-            // Fall through to default
+            // Corrupted or inaccessible settings — fall through to defaults
         }
         return new Settings();
     }
@@ -86,5 +88,21 @@ public class Settings
         {
             // Settings save failure is non-critical
         }
+    }
+
+    /// <summary>Clamp all values to valid ranges to prevent crashes from hand-edited or corrupted settings.</summary>
+    private void Validate()
+    {
+        CheckIntervalSeconds = Math.Clamp(CheckIntervalSeconds, 1, 60);
+        ThresholdPercent = Math.Clamp(ThresholdPercent, 10, 95);
+        CooldownSeconds = Math.Clamp(CooldownSeconds, 5, 300);
+        CacheMaxPercent = Math.Clamp(CacheMaxPercent, 0, 75);
+        SelfWorkingSetCapMB = Math.Clamp(SelfWorkingSetCapMB, 0, 100);
+        HistoryMaxItems = Math.Clamp(HistoryMaxItems, 1, 500);
+        ScheduledOptimizeIntervalMinutes = Math.Clamp(ScheduledOptimizeIntervalMinutes, 1, 240);
+        WindowWidth = double.IsFinite(WindowWidth) ? Math.Clamp(WindowWidth, 400, 4000) : 1000;
+        WindowHeight = double.IsFinite(WindowHeight) ? Math.Clamp(WindowHeight, 300, 3000) : 700;
+        ThemeMode ??= "System";
+        ExcludedProcesses ??= [];
     }
 }

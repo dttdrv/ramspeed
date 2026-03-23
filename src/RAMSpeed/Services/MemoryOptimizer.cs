@@ -211,7 +211,13 @@ internal class MemoryOptimizer : IDisposable
             GC.WaitForPendingFinalizers();
         }
 
-        NativeMethods.EmptyWorkingSet(Process.GetCurrentProcess().Handle);
+        // Use the NativeMethods pseudo-handle (-1) instead of Process.GetCurrentProcess().Handle
+        // to avoid leaking a Process object on every call (this runs on every timer tick).
+        try
+        {
+            NativeMethods.EmptyWorkingSet(NativeMethods.GetCurrentProcess());
+        }
+        catch { /* EmptyWorkingSet can throw under extreme memory pressure */ }
 
         // Apply hard working set cap
         if (workingSetCapMB > 0)

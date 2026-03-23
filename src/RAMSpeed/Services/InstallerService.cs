@@ -66,6 +66,18 @@ internal static class InstallerService
             return;
         }
 
+        // Installing to Program Files and HKLM registry requires elevation
+        if (!IsRunningAsAdmin())
+        {
+            System.Windows.MessageBox.Show(
+                "Installation to Program Files requires administrator privileges.\n\n" +
+                "Please restart RAMSpeed as administrator to install.",
+                "Administrator Required",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+            return;
+        }
+
         var result = System.Windows.MessageBox.Show(
             "Install RAMSpeed to Program Files?\n\n" +
             "  \u2022 Copies to C:\\Program Files\\RAMSpeed\\\n" +
@@ -113,12 +125,19 @@ internal static class InstallerService
         }
     }
 
+    private static bool IsRunningAsAdmin()
+    {
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        var principal = new System.Security.Principal.WindowsPrincipal(identity);
+        return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+    }
+
     private static void RunSelfUninstall(string installDir)
     {
         var startMenuDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu),
             "Programs", AppName);
-        var tempScript = Path.Combine(Path.GetTempPath(), "RAMSpeed_Uninstall.cmd");
+        var tempScript = Path.Combine(Path.GetTempPath(), $"RAMSpeed_Uninstall_{Guid.NewGuid():N}.cmd");
 
         var script =
             "@echo off\r\n" +
