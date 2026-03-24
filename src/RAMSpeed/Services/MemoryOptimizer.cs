@@ -230,7 +230,7 @@ internal class MemoryOptimizer : IDisposable
         OptimizationLevel level = OptimizationLevel.Balanced,
         int cacheMaxPercent = 0,
         int targetThresholdPercent = 0,
-        bool isLowMemory = false)
+        bool isLowMemory = false) // Used by Layer 3: compressed memory awareness
     {
         ThrowIfDisposed();
 
@@ -355,6 +355,7 @@ internal class MemoryOptimizer : IDisposable
         };
     }
 
+    // Used by TrimProcessWorkingSets (sorted trimming + early exit) and effectiveness tracking
     private static ulong GetAvailablePhysicalBytesQuick()
     {
         var ms = new NativeMethods.MEMORYSTATUSEX
