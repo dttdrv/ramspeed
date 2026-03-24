@@ -42,6 +42,7 @@ public class MainViewModel : ViewModelBase
     private int _optimizationCount;
 
     // ── State ──
+    private bool _isLoading = true;
     private bool _isOptimizing;
     private string _statusText = "Ready";
     private bool _autoOptimizeEnabled;
@@ -92,29 +93,27 @@ public class MainViewModel : ViewModelBase
 
     public event Action<MemoryInfo>? MemoryInfoUpdated;
 
-    public void Initialize()
+    public async void Initialize()
     {
-        if (_initialized)
-            return;
+        if (_initialized) return;
 
-        _initialized = true;
+        // Construct monitor on UI thread (DispatcherTimer requires it)
         _ = Monitor;
         ApplyMonitorSettings();
         Monitor.MemoryUpdated += OnMemoryUpdated;
         Monitor.OptimizationCompleted += OnOptimizationCompleted;
 
-        try
+        // Move only the slow privilege calls off UI thread
+        await Task.Run(() =>
         {
-            if (!PrivilegeManager.EnableAllRequired() && !IsReadOnlyMode)
-                StatusText = "Warning: some privileges could not be enabled — optimization may be limited";
-        }
-        catch { }
+            if (!((App)Application.Current).IsReadOnlyMode)
+                PrivilegeManager.EnableAllRequired();
+        });
 
-        try { Monitor.Start(CheckIntervalSeconds); }
-        catch (Exception ex)
-        {
-            StatusText = $"Monitor failed to start: {ex.Message}";
-        }
+        // Back on UI thread — start the timer
+        Monitor.Start(_settings.CheckIntervalSeconds);
+        _initialized = true;
+        IsLoading = false;
     }
 
     // ── Bound Properties ──
@@ -136,6 +135,8 @@ public class MainViewModel : ViewModelBase
     public double CompressedMB { get => _compressedMB; set => SetProperty(ref _compressedMB, value); }
     public double TotalFreedMB { get => _totalFreedMB; set => SetProperty(ref _totalFreedMB, value); }
     public int OptimizationCount { get => _optimizationCount; set => SetProperty(ref _optimizationCount, value); }
+
+    public bool IsLoading { get => _isLoading; set => SetProperty(ref _isLoading, value); }
 
     public bool IsOptimizing
     {
