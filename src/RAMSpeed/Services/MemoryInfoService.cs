@@ -14,6 +14,8 @@ internal class MemoryInfoService : IDisposable
     private PerformanceCounter? _freeCounter;
     private bool _perfCountersAvailable;
     private bool _disposed;
+    private ulong _cachedCompressedBytes;
+    private DateTime _compressedCacheExpiry;
 
     public MemoryInfoService()
     {
@@ -134,21 +136,30 @@ internal class MemoryInfoService : IDisposable
 
     /// <summary>
     /// Read compressed memory size from the "Memory Compression" process working set.
+    /// Cached with a 30-second TTL to avoid expensive process enumeration on every poll.
     /// </summary>
-    private static ulong GetCompressedMemoryBytes()
+    private ulong GetCompressedMemoryBytes()
     {
+        if (DateTime.UtcNow < _compressedCacheExpiry)
+            return _cachedCompressedBytes;
+
         try
         {
             var procs = Process.GetProcessesByName("Memory Compression");
             if (procs.Length > 0)
             {
-                var bytes = (ulong)procs[0].WorkingSet64;
+                _cachedCompressedBytes = (ulong)procs[0].WorkingSet64;
                 foreach (var p in procs) p.Dispose();
-                return bytes;
+            }
+            else
+            {
+                _cachedCompressedBytes = 0;
             }
         }
-        catch { }
-        return 0;
+        catch { _cachedCompressedBytes = 0; }
+
+        _compressedCacheExpiry = DateTime.UtcNow.AddSeconds(30);
+        return _cachedCompressedBytes;
     }
 
     private static void DisposeCounter(ref PerformanceCounter? counter)
