@@ -13,3 +13,8 @@ c68a381	perf	keep	deferred PerformanceCounter creation to background thread
 820f461	perf	keep	debounced settings save (500ms, snapshot on UI thread)
 76070dc	perf	keep	async process list enumeration off UI thread
 d9dfa01	perf	keep	cached tray icon renders, skip when percentage unchanged
+77eae70	polish	keep	lazy-load process list on tab navigation
+a5649fe	polish	keep	async Initialize with off-thread privilege enabling
+350e5f0	polish	keep	skip compressed memory enumeration on first poll
+3fd4470	polish	keep	remove Private Bytes from process view
+cb98a8c	polish	keep	loading overlay with ProgressRing during init
