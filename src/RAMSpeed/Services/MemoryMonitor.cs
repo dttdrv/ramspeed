@@ -15,6 +15,7 @@ internal class MemoryMonitor : IDisposable
     private bool _threadOptimized;
     private int _optimizationInProgress;
     private bool _disposed;
+    private bool _armed = true;
 
     // Memory resource notification handles
     private IntPtr _lowMemoryHandle;
@@ -31,6 +32,7 @@ internal class MemoryMonitor : IDisposable
     public int CacheMaxPercent { get; set; } = 0;
     public bool ScheduledOptimizeEnabled { get; set; }
     public int ScheduledOptimizeIntervalMinutes { get; set; } = 30;
+    public int HysteresisGap { get; set; } = 10;
 
     public MemoryOptimizer Optimizer => _optimizer;
     public MemoryInfo? LastMemoryInfo { get; private set; }
@@ -156,10 +158,15 @@ internal class MemoryMonitor : IDisposable
         if ((DateTime.Now - _lastOptimization).TotalSeconds < CooldownSeconds)
             return;
 
-        // Auto-optimize: react to OS low-memory signal OR threshold breach
-        if (IsLowMemory || LastMemoryInfo.UsagePercent >= ThresholdPercent)
+        // Hysteresis: re-arm when usage drops below threshold minus gap
+        if (!_armed && LastMemoryInfo.UsagePercent < (ThresholdPercent - HysteresisGap))
+            _armed = true;
+
+        // Auto-optimize: OS low-memory always fires; threshold requires armed state
+        if (IsLowMemory || (_armed && LastMemoryInfo.UsagePercent >= ThresholdPercent))
         {
             RunOptimization();
+            _armed = false;
         }
     }
 
