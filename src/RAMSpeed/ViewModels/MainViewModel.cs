@@ -151,7 +151,7 @@ public class MainViewModel : ViewModelBase
             {
                 if (_initialized) Monitor.AutoOptimizeEnabled = value;
                 _settings.AutoOptimizeEnabled = value;
-                _settings.Save();
+                _settings.SaveDebounced();
                 StatusText = value ? $"Auto-optimizing (threshold: {ThresholdPercent}%)" : "Auto-optimize off";
             }
         }
@@ -166,7 +166,7 @@ public class MainViewModel : ViewModelBase
             {
                 if (_initialized) Monitor.ThresholdPercent = _thresholdPercent;
                 _settings.ThresholdPercent = _thresholdPercent;
-                _settings.Save();
+                _settings.SaveDebounced();
             }
         }
     }
@@ -180,7 +180,7 @@ public class MainViewModel : ViewModelBase
             {
                 if (_initialized) Monitor.SetInterval(_checkIntervalSeconds);
                 _settings.CheckIntervalSeconds = _checkIntervalSeconds;
-                _settings.Save();
+                _settings.SaveDebounced();
             }
         }
     }
@@ -194,7 +194,7 @@ public class MainViewModel : ViewModelBase
             {
                 if (_initialized) Monitor.CooldownSeconds = _cooldownSeconds;
                 _settings.CooldownSeconds = _cooldownSeconds;
-                _settings.Save();
+                _settings.SaveDebounced();
             }
         }
     }
@@ -214,7 +214,7 @@ public class MainViewModel : ViewModelBase
                 };
                 if (_initialized) Monitor.Level = level;
                 _settings.Level = level;
-                _settings.Save();
+                _settings.SaveDebounced();
             }
         }
     }
@@ -239,7 +239,7 @@ public class MainViewModel : ViewModelBase
                 }
 
                 _settings.StartWithWindows = value;
-                _settings.Save();
+                _settings.SaveDebounced();
                 StatusText = value
                     ? "Start with Windows enabled"
                     : "Start with Windows disabled";
@@ -255,7 +255,7 @@ public class MainViewModel : ViewModelBase
             if (SetProperty(ref _minimizeToTray, value))
             {
                 _settings.MinimizeToTray = value;
-                _settings.Save();
+                _settings.SaveDebounced();
             }
         }
     }
@@ -269,7 +269,7 @@ public class MainViewModel : ViewModelBase
             {
                 if (_initialized) Monitor.CacheMaxPercent = _cacheMaxPercent;
                 _settings.CacheMaxPercent = _cacheMaxPercent;
-                _settings.Save();
+                _settings.SaveDebounced();
             }
         }
     }
@@ -283,7 +283,7 @@ public class MainViewModel : ViewModelBase
             {
                 if (_initialized) Monitor.SelfWorkingSetCapMB = _selfWorkingSetCapMB;
                 _settings.SelfWorkingSetCapMB = _selfWorkingSetCapMB;
-                _settings.Save();
+                _settings.SaveDebounced();
             }
         }
     }
@@ -297,7 +297,7 @@ public class MainViewModel : ViewModelBase
             {
                 if (_initialized) Monitor.ScheduledOptimizeEnabled = value;
                 _settings.ScheduledOptimizeEnabled = value;
-                _settings.Save();
+                _settings.SaveDebounced();
             }
         }
     }
@@ -311,7 +311,7 @@ public class MainViewModel : ViewModelBase
             {
                 if (_initialized) Monitor.ScheduledOptimizeIntervalMinutes = _scheduledOptimizeIntervalMinutes;
                 _settings.ScheduledOptimizeIntervalMinutes = _scheduledOptimizeIntervalMinutes;
-                _settings.Save();
+                _settings.SaveDebounced();
             }
         }
     }
@@ -625,7 +625,7 @@ public class MainViewModel : ViewModelBase
             Monitor.Optimizer.ExcludedProcesses.Remove(proc.Name);
             _settings.ExcludedProcesses.Remove(proc.Name);
         }
-        _settings.Save();
+        _settings.SaveDebounced();
     }
 
     private void SetProcessWorkingSetCap(ProcessMemoryInfo? proc)

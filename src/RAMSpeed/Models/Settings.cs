@@ -62,6 +62,8 @@ public class Settings
         WriteIndented = true
     };
 
+    private CancellationTokenSource? _saveCts;
+
     public static Settings Load()
     {
         try
@@ -93,6 +95,30 @@ public class Settings
         {
             // Settings save failure is non-critical
         }
+    }
+
+    public void SaveDebounced()
+    {
+        var oldCts = _saveCts;
+        oldCts?.Cancel();
+        _saveCts = new CancellationTokenSource();
+        var token = _saveCts.Token;
+        oldCts?.Dispose();
+
+        // Snapshot on UI thread to avoid torn reads
+        var json = JsonSerializer.Serialize(this, JsonOptions);
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(500, token);
+                Directory.CreateDirectory(SettingsDir);
+                await File.WriteAllTextAsync(SettingsFile, json, token);
+            }
+            catch (OperationCanceledException) { }
+            catch { }
+        });
     }
 
     /// <summary>Clamp all values to valid ranges to prevent crashes from hand-edited or corrupted settings.</summary>
