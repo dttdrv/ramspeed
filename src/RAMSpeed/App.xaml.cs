@@ -21,7 +21,6 @@ public partial class App : Application
     private Mutex? _singleInstanceMutex;
     private SingleInstanceActivationService? _activationService;
     private bool _pendingActivationRestore;
-    private bool _ownsMutex;
 
     /// <summary>True when running without admin — optimization disabled, monitoring only.</summary>
     internal bool IsReadOnlyMode { get; private set; }
@@ -80,7 +79,6 @@ public partial class App : Application
             return;
         }
 
-        _ownsMutex = true;
         _activationService = new SingleInstanceActivationService(ActivationSignalName, OnActivationSignal);
 
         // Admin check — try silent elevation via scheduled task, then UAC, then read-only
@@ -154,8 +152,7 @@ public partial class App : Application
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         ThemeService.Instance.Dispose();
         _activationService?.Dispose();
-        if (_ownsMutex)
-            _singleInstanceMutex?.ReleaseMutex();
+        try { _singleInstanceMutex?.ReleaseMutex(); } catch { }
         _singleInstanceMutex?.Dispose();
         base.OnExit(e);
     }
