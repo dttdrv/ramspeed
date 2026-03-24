@@ -576,6 +576,13 @@ public class MainViewModel : ViewModelBase
         Monitor.ScheduledOptimizeEnabled = _settings.ScheduledOptimizeEnabled;
         Monitor.ScheduledOptimizeIntervalMinutes = _settings.ScheduledOptimizeIntervalMinutes;
         Monitor.Optimizer.ExcludedProcesses = new HashSet<string>(_settings.ExcludedProcesses, StringComparer.OrdinalIgnoreCase);
+
+        // Algorithmic improvement settings (JSON-only, no UI binding)
+        Monitor.HysteresisGap = _settings.HysteresisGap;
+        Monitor.TrendWindowSize = _settings.TrendWindowSize;
+        Monitor.PredictiveLeadSeconds = _settings.PredictiveLeadSeconds;
+        Monitor.AccessedBitsDelayMs = _settings.AccessedBitsDelayMs;
+        Monitor.EffectivenessTrackingEnabled = _settings.EffectivenessTrackingEnabled;
     }
 
     public void SaveWindowState(double width, double height, double left, double top)
