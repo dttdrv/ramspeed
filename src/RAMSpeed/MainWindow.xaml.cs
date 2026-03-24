@@ -52,7 +52,6 @@ public partial class MainWindow : FluentWindow
                     _vm.IsReadOnlyMode = true;
 
                 _vm.Initialize();
-                _vm.RefreshProcessList();
                 if (_vm.LastMemoryInfo != null)
                     _tray?.UpdateTooltip(_vm.LastMemoryInfo);
                 app?.RestorePendingActivation();
@@ -248,6 +247,15 @@ public partial class MainWindow : FluentWindow
     internal void RestoreFromExternalActivation()
     {
         RestoreWindow();
+    }
+
+    private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.TabControl tc && tc.SelectedItem is TabItem tab && tab.Header?.ToString() == "Processes")
+        {
+            var vm = DataContext as MainViewModel;
+            vm?.RefreshProcessList();
+        }
     }
 
     // Menu handlers removed — all actions are in the UI directly.

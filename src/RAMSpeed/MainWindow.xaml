@@ -356,7 +356,7 @@
                     </Border>
 
                     <!-- Tabs -->
-                    <TabControl Grid.Row="2">
+                    <TabControl Grid.Row="2" SelectionChanged="TabControl_SelectionChanged">
                         <TabItem Header="Processes">
                             <DockPanel>
                                 <DockPanel DockPanel.Dock="Top" Margin="2,3,2,2">
