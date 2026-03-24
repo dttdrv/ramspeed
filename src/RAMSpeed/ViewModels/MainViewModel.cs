@@ -56,6 +56,9 @@ public class MainViewModel : ViewModelBase
     private bool _scheduledOptimizeEnabled;
     private int _scheduledOptimizeIntervalMinutes = 30;
 
+    // ── Process list ──
+    private bool _refreshingProcesses;
+
     // ── Process filter ──
     private string _processFilterText = "";
     private ICollectionView? _filteredProcesses;
@@ -432,45 +435,49 @@ public class MainViewModel : ViewModelBase
         AutoOptimizeEnabled = !AutoOptimizeEnabled;
     }
 
-    public void RefreshProcessList()
+    public async void RefreshProcessList()
     {
-        Processes.Clear();
+        if (_refreshingProcesses) return;
+        _refreshingProcesses = true;
+
         try
         {
-            var processes = Process.GetProcesses()
-                .Select(p =>
+            var excludedSet = _monitor?.Optimizer.ExcludedProcesses ?? [];
+
+            var processes = await Task.Run(() =>
+            {
+                var list = new List<ProcessMemoryInfo>();
+                foreach (var proc in Process.GetProcesses())
                 {
                     try
                     {
-                        var info = new ProcessMemoryInfo
+                        list.Add(new ProcessMemoryInfo
                         {
-                            Pid = p.Id,
-                            Name = p.ProcessName,
-                            WorkingSetBytes = p.WorkingSet64,
-                            PrivateBytes = p.PrivateMemorySize64,
-                            IsExcluded = (_monitor?.Optimizer.ExcludedProcesses ?? []).Contains(p.ProcessName)
-                        };
-                        return info;
+                            Pid = proc.Id,
+                            Name = proc.ProcessName,
+                            WorkingSetBytes = proc.WorkingSet64,
+                            PrivateBytes = proc.PrivateMemorySize64,
+                            IsExcluded = excludedSet.Contains(proc.ProcessName)
+                        });
                     }
-                    catch
-                    {
-                        return null;
-                    }
-                    finally
-                    {
-                        p.Dispose();
-                    }
-                })
-                .Where(p => p != null)
-                .OrderByDescending(p => p!.WorkingSetBytes)
-                .Take(100);
+                    catch { }
+                    finally { proc.Dispose(); }
+                }
+                return list.OrderByDescending(p => p.WorkingSetBytes).Take(100).ToList();
+            });
 
+            // Update ObservableCollection on UI thread
+            Processes.Clear();
             foreach (var p in processes)
-                Processes.Add(p!);
+                Processes.Add(p);
         }
         catch
         {
             // Process enumeration can throw
+        }
+        finally
+        {
+            _refreshingProcesses = false;
         }
     }
 
