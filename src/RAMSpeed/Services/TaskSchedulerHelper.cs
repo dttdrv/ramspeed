@@ -88,7 +88,7 @@ internal static class TaskSchedulerHelper
                 return false;
             }
 
-            return p.ExitCode == 0;
+            return p.HasExited && p.ExitCode == 0;
         }
         catch { return false; }
         finally
