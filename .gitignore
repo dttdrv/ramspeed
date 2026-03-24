@@ -4,6 +4,8 @@ bin/
 obj/
 publish/
 dist/
+portable/
+installer/output/
 
 # ide
 .vs/
