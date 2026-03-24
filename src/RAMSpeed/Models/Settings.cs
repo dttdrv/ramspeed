@@ -46,6 +46,11 @@ public class Settings
     public bool ScheduledOptimizeEnabled { get; set; } = false;
     public int ScheduledOptimizeIntervalMinutes { get; set; } = 30;
     public string ThemeMode { get; set; } = "System"; // "System", "Light", "Dark"
+    public int HysteresisGap { get; set; } = 10;
+    public int TrendWindowSize { get; set; } = 10;
+    public int PredictiveLeadSeconds { get; set; } = 15;
+    public int AccessedBitsDelayMs { get; set; } = 2000;
+    public bool EffectivenessTrackingEnabled { get; set; } = true;
 
     private static readonly string SettingsDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RAMSpeed");
@@ -100,6 +105,10 @@ public class Settings
         SelfWorkingSetCapMB = Math.Clamp(SelfWorkingSetCapMB, 0, 100);
         HistoryMaxItems = Math.Clamp(HistoryMaxItems, 1, 500);
         ScheduledOptimizeIntervalMinutes = Math.Clamp(ScheduledOptimizeIntervalMinutes, 1, 240);
+        HysteresisGap = Math.Clamp(HysteresisGap, 5, 30);
+        TrendWindowSize = Math.Clamp(TrendWindowSize, 5, 30);
+        PredictiveLeadSeconds = Math.Clamp(PredictiveLeadSeconds, 5, 60);
+        AccessedBitsDelayMs = Math.Clamp(AccessedBitsDelayMs, 500, 5000);
         WindowWidth = double.IsFinite(WindowWidth) ? Math.Clamp(WindowWidth, 400, 4000) : 1000;
         WindowHeight = double.IsFinite(WindowHeight) ? Math.Clamp(WindowHeight, 300, 3000) : 700;
         ThemeMode ??= "System";
