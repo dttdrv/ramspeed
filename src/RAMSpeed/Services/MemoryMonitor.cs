@@ -16,6 +16,7 @@ internal class MemoryMonitor : IDisposable
     private int _optimizationInProgress;
     private bool _disposed;
     private bool _armed = true;
+    private readonly Queue<(DateTime time, double usage)> _usageHistory = new();
 
     // Memory resource notification handles
     private IntPtr _lowMemoryHandle;
@@ -33,6 +34,8 @@ internal class MemoryMonitor : IDisposable
     public bool ScheduledOptimizeEnabled { get; set; }
     public int ScheduledOptimizeIntervalMinutes { get; set; } = 30;
     public int HysteresisGap { get; set; } = 10;
+    public int TrendWindowSize { get; set; } = 10;
+    public int PredictiveLeadSeconds { get; set; } = 15;
 
     public MemoryOptimizer Optimizer => _optimizer;
     public MemoryInfo? LastMemoryInfo { get; private set; }
@@ -136,6 +139,13 @@ internal class MemoryMonitor : IDisposable
 
         RefreshMemoryInfo();
 
+        if (LastMemoryInfo != null)
+        {
+            _usageHistory.Enqueue((DateTime.UtcNow, LastMemoryInfo.UsagePercent));
+            while (_usageHistory.Count > TrendWindowSize)
+                _usageHistory.Dequeue();
+        }
+
         MaybeTrimSelf(SelfTrimReason.Periodic);
 
         // Query OS memory resource notifications
@@ -162,12 +172,55 @@ internal class MemoryMonitor : IDisposable
         if (!_armed && LastMemoryInfo.UsagePercent < (ThresholdPercent - HysteresisGap))
             _armed = true;
 
+        // Predictive trigger: if slope predicts threshold breach within lead time
+        if (_armed && !IsLowMemory && LastMemoryInfo.UsagePercent < ThresholdPercent)
+        {
+            double slope = ComputeUsageTrend();
+            if (slope > 0)
+            {
+                double predicted = LastMemoryInfo.UsagePercent + slope * PredictiveLeadSeconds;
+                if (predicted >= ThresholdPercent)
+                {
+                    RunOptimization();
+                    _armed = false;
+                    return;
+                }
+            }
+        }
+
         // Auto-optimize: OS low-memory always fires; threshold requires armed state
         if (IsLowMemory || (_armed && LastMemoryInfo.UsagePercent >= ThresholdPercent))
         {
             RunOptimization();
             _armed = false;
         }
+    }
+
+    private double ComputeUsageTrend()
+    {
+        if (_usageHistory.Count < 3)
+            return 0;
+
+        var samples = _usageHistory.ToArray();
+        var t0 = samples[0].time;
+        int n = samples.Length;
+        double sumT = 0, sumU = 0, sumTU = 0, sumT2 = 0;
+
+        for (int i = 0; i < n; i++)
+        {
+            double t = (samples[i].time - t0).TotalSeconds;
+            double u = samples[i].usage;
+            sumT += t;
+            sumU += u;
+            sumTU += t * u;
+            sumT2 += t * t;
+        }
+
+        double denominator = n * sumT2 - sumT * sumT;
+        if (Math.Abs(denominator) < 0.0001)
+            return 0;
+
+        return (n * sumTU - sumT * sumU) / denominator;
     }
 
     private void CheckMemoryResourceNotifications()
