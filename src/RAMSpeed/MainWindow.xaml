@@ -429,5 +429,19 @@
                 </Grid>
             </Grid>
         </DockPanel>
+
+        <!-- Loading overlay -->
+        <Grid Grid.RowSpan="2"
+              Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"
+              Background="{DynamicResource ApplicationBackgroundBrush}"
+              Panel.ZIndex="100">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ui:ProgressRing IsIndeterminate="True" Width="48" Height="48" />
+                <TextBlock Text="Loading..."
+                           Margin="0,12,0,0"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </ui:FluentWindow>
