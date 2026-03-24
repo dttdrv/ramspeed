@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
 using RAMSpeed.Models;
 using RAMSpeed.Native;
 
@@ -258,7 +259,8 @@ internal class MemoryOptimizer : IDisposable
         OptimizationLevel level = OptimizationLevel.Balanced,
         int cacheMaxPercent = 0,
         int targetThresholdPercent = 0,
-        bool isLowMemory = false) // Used by Layer 3: compressed memory awareness
+        bool isLowMemory = false,
+        int accessedBitsDelayMs = 2000)
     {
         ThrowIfDisposed();
 
@@ -294,35 +296,39 @@ internal class MemoryOptimizer : IDisposable
             {
                 actualLevel = OptimizationLevel.Balanced;
 
-                // Step 2: Flush modified page list
-                if (FlushModifiedList())
-                    methodsUsed.Add("Modified List Flush");
-
-                // Step 3: Reset accessed bits
+                // Step 2: Reset accessed bits FIRST (two-pass: mark pages as unvisited)
                 if (CaptureAndResetAccessedBits())
                     methodsUsed.Add("Access Bits Reset");
 
-                // Step 4: Purge standby (balanced = low-priority only)
+                // Step 3: Flush modified page list (useful work during delay)
+                if (FlushModifiedList())
+                    methodsUsed.Add("Modified List Flush");
+
+                // Step 4: Two-pass delay — let active pages get re-accessed
+                if (accessedBitsDelayMs > 0)
+                    Thread.Sleep(accessedBitsDelayMs);
+
+                // Step 5: Purge standby — pages not re-accessed during delay are truly idle
                 if (level == OptimizationLevel.Balanced)
                 {
                     if (PurgeLowPriorityStandby())
                         methodsUsed.Add("Low-Priority Standby Purge");
                 }
 
-                // Step 5: Flush system file cache
+                // Step 6: Flush system file cache
                 if (FlushSystemFileCache())
                     methodsUsed.Add("File Cache Flush");
 
-                // Step 6: Flush registry cache
+                // Step 7: Flush registry cache
                 if (FlushRegistryCache())
                     methodsUsed.Add("Registry Cache Flush");
 
-                // Step 7: Page combining
+                // Step 8: Page combining
                 var pagesCombined = CombinePhysicalMemory();
                 if (pagesCombined > 0)
                     methodsUsed.Add($"Page Combine ({pagesCombined} pages)");
 
-                // Step 8: File cache cap
+                // Step 9: File cache cap
                 if (cacheMaxPercent > 0)
                 {
                     var totalRam = (double)beforeInfo.TotalPhysicalBytes;
