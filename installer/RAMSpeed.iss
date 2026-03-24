@@ -10,7 +10,7 @@
 ;     -p:DebugType=embedded -o portable/
 
 #define AppName    "RAMSpeed"
-#define AppVer     "1.0.3"
+#define AppVer     "2.0.0"
 #define AppExe     "RAMSpeed.exe"
 
 [Setup]
