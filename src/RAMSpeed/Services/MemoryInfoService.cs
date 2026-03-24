@@ -17,30 +17,38 @@ internal class MemoryInfoService : IDisposable
 
     public MemoryInfoService()
     {
-        try
+        // Counters are NOT created here. WarmUpAsync() handles creation + priming.
+        _perfCountersAvailable = false;
+    }
+
+    public Task WarmUpAsync()
+    {
+        return Task.Run(() =>
         {
-            _standbyNormalCounter = new PerformanceCounter("Memory", "Standby Cache Normal Priority Bytes");
-            _standbyReserveCounter = new PerformanceCounter("Memory", "Standby Cache Reserve Bytes");
-            _standbyCoreCounter = new PerformanceCounter("Memory", "Standby Cache Core Bytes");
-            _modifiedCounter = new PerformanceCounter("Memory", "Modified Page List Bytes");
-            _freeCounter = new PerformanceCounter("Memory", "Free & Zero Page List Bytes");
-            // Prime counters (first read is often 0)
-            _standbyNormalCounter.NextValue();
-            _standbyReserveCounter.NextValue();
-            _standbyCoreCounter.NextValue();
-            _modifiedCounter.NextValue();
-            _freeCounter.NextValue();
-            _perfCountersAvailable = true;
-        }
-        catch
-        {
-            _perfCountersAvailable = false;
-            DisposeCounter(ref _standbyNormalCounter);
-            DisposeCounter(ref _standbyReserveCounter);
-            DisposeCounter(ref _standbyCoreCounter);
-            DisposeCounter(ref _modifiedCounter);
-            DisposeCounter(ref _freeCounter);
-        }
+            try
+            {
+                _standbyNormalCounter = new PerformanceCounter("Memory", "Standby Cache Normal Priority Bytes");
+                _standbyReserveCounter = new PerformanceCounter("Memory", "Standby Cache Reserve Bytes");
+                _standbyCoreCounter = new PerformanceCounter("Memory", "Standby Cache Core Bytes");
+                _modifiedCounter = new PerformanceCounter("Memory", "Modified Page List Bytes");
+                _freeCounter = new PerformanceCounter("Memory", "Free & Zero Page List Bytes");
+                _standbyNormalCounter.NextValue();
+                _standbyReserveCounter.NextValue();
+                _standbyCoreCounter.NextValue();
+                _modifiedCounter.NextValue();
+                _freeCounter.NextValue();
+                _perfCountersAvailable = true;
+            }
+            catch
+            {
+                _perfCountersAvailable = false;
+                DisposeCounter(ref _standbyNormalCounter);
+                DisposeCounter(ref _standbyReserveCounter);
+                DisposeCounter(ref _standbyCoreCounter);
+                DisposeCounter(ref _modifiedCounter);
+                DisposeCounter(ref _freeCounter);
+            }
+        });
     }
 
     public MemoryInfo GetCurrentMemoryInfo()

@@ -78,6 +78,7 @@ internal class MemoryMonitor : IDisposable
         // Immediately fire first update
         RefreshMemoryInfo();
         MaybeTrimSelf(SelfTrimReason.Startup);
+        _memoryInfoService.WarmUpAsync(); // fire-and-forget background warm-up
     }
 
     public void Stop()
