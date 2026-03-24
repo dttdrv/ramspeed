@@ -37,6 +37,7 @@ internal class MemoryMonitor : IDisposable
     public int TrendWindowSize { get; set; } = 10;
     public int PredictiveLeadSeconds { get; set; } = 15;
     public int AccessedBitsDelayMs { get; set; } = 2000;
+    public bool EffectivenessTrackingEnabled { get; set; } = true;
 
     public MemoryOptimizer Optimizer => _optimizer;
     public MemoryInfo? LastMemoryInfo { get; private set; }
@@ -107,7 +108,7 @@ internal class MemoryMonitor : IDisposable
         Interlocked.Increment(ref _optimizationInProgress);
         try
         {
-            var result = _optimizer.OptimizeAll(levelOverride ?? Level, CacheMaxPercent, ThresholdPercent, IsLowMemory, AccessedBitsDelayMs);
+            var result = _optimizer.OptimizeAll(levelOverride ?? Level, CacheMaxPercent, ThresholdPercent, IsLowMemory, AccessedBitsDelayMs, EffectivenessTrackingEnabled);
             _lastOptimization = DateTime.Now;
             OptimizationCompleted?.Invoke(result);
 

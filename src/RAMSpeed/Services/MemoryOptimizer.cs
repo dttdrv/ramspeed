@@ -16,6 +16,7 @@ internal class MemoryOptimizer : IDisposable
     };
 
     private readonly MemoryInfoService _memoryInfo = new();
+    private readonly StepEffectivenessTracker _tracker = new();
     private bool _disposed;
 
     public HashSet<string> ExcludedProcesses { get; set; } = new(DefaultExclusions, StringComparer.OrdinalIgnoreCase);
@@ -260,7 +261,8 @@ internal class MemoryOptimizer : IDisposable
         int cacheMaxPercent = 0,
         int targetThresholdPercent = 0,
         bool isLowMemory = false,
-        int accessedBitsDelayMs = 2000)
+        int accessedBitsDelayMs = 2000,
+        bool effectivenessTrackingEnabled = true)
     {
         ThrowIfDisposed();
 
@@ -297,12 +299,10 @@ internal class MemoryOptimizer : IDisposable
                 actualLevel = OptimizationLevel.Balanced;
 
                 // Step 2: Reset accessed bits FIRST (two-pass: mark pages as unvisited)
-                if (CaptureAndResetAccessedBits())
-                    methodsUsed.Add("Access Bits Reset");
+                RunTrackedStep("Access Bits Reset", CaptureAndResetAccessedBits, methodsUsed, effectivenessTrackingEnabled);
 
                 // Step 3: Flush modified page list (useful work during delay)
-                if (FlushModifiedList())
-                    methodsUsed.Add("Modified List Flush");
+                RunTrackedStep("Modified List Flush", FlushModifiedList, methodsUsed, effectivenessTrackingEnabled);
 
                 // Step 4: Two-pass delay — let active pages get re-accessed
                 if (accessedBitsDelayMs > 0)
@@ -311,17 +311,14 @@ internal class MemoryOptimizer : IDisposable
                 // Step 5: Purge standby — pages not re-accessed during delay are truly idle
                 if (level == OptimizationLevel.Balanced)
                 {
-                    if (PurgeLowPriorityStandby())
-                        methodsUsed.Add("Low-Priority Standby Purge");
+                    RunTrackedStep("Low-Priority Standby Purge", PurgeLowPriorityStandby, methodsUsed, effectivenessTrackingEnabled);
                 }
 
                 // Step 6: Flush system file cache
-                if (FlushSystemFileCache())
-                    methodsUsed.Add("File Cache Flush");
+                RunTrackedStep("File Cache Flush", FlushSystemFileCache, methodsUsed, effectivenessTrackingEnabled);
 
                 // Step 7: Flush registry cache
-                if (FlushRegistryCache())
-                    methodsUsed.Add("Registry Cache Flush");
+                RunTrackedStep("Registry Cache Flush", FlushRegistryCache, methodsUsed, effectivenessTrackingEnabled);
 
                 // Step 8: Page combining
                 var pagesCombined = CombinePhysicalMemory();
@@ -370,6 +367,28 @@ internal class MemoryOptimizer : IDisposable
                 ActualLevelUsed = actualLevel
             };
         }
+    }
+
+    private bool RunTrackedStep(string stepName, Func<bool> step, List<string> methodsUsed, bool trackingEnabled)
+    {
+        if (trackingEnabled && _tracker.ShouldSkip(stepName))
+        {
+            methodsUsed.Add($"Skipped: {stepName} (ineffective)");
+            return false;
+        }
+
+        ulong before = trackingEnabled ? GetAvailablePhysicalBytesQuick() : 0;
+        bool success = step();
+        if (trackingEnabled)
+        {
+            ulong after = GetAvailablePhysicalBytesQuick();
+            _tracker.Record(stepName, (long)(after - before));
+        }
+
+        if (success)
+            methodsUsed.Add(stepName);
+
+        return success;
     }
 
     private OptimizationResult BuildResult(
