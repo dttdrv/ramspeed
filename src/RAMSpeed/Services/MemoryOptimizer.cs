@@ -19,7 +19,7 @@ internal class MemoryOptimizer : IDisposable
 
     public HashSet<string> ExcludedProcesses { get; set; } = new(DefaultExclusions, StringComparer.OrdinalIgnoreCase);
 
-    public (int trimmed, int failed, int skipped) TrimProcessWorkingSets()
+    public (int trimmed, int failed, int skipped, bool earlyExit) TrimProcessWorkingSets(long targetAvailableBytes = 0)
     {
         ThrowIfDisposed();
 
@@ -72,7 +72,7 @@ internal class MemoryOptimizer : IDisposable
             }
         }
 
-        return (trimmed, failed, skipped);
+        return (trimmed, failed, skipped, false);
     }
 
     public bool PurgeStandbyList()
@@ -226,7 +226,11 @@ internal class MemoryOptimizer : IDisposable
         }
     }
 
-    public OptimizationResult OptimizeAll(OptimizationLevel level = OptimizationLevel.Balanced, int cacheMaxPercent = 0)
+    public OptimizationResult OptimizeAll(
+        OptimizationLevel level = OptimizationLevel.Balanced,
+        int cacheMaxPercent = 0,
+        int targetThresholdPercent = 0,
+        bool isLowMemory = false)
     {
         ThrowIfDisposed();
 
@@ -234,55 +238,56 @@ internal class MemoryOptimizer : IDisposable
         var methodsUsed = new List<string>();
         var beforeInfo = _memoryInfo.GetCurrentMemoryInfo();
         var beforeAvailable = (double)beforeInfo.AvailablePhysicalBytes;
+        var actualLevel = OptimizationLevel.Conservative;
 
         int processesTrimmed = 0;
 
         try
         {
             // Step 1: Trim process working sets (all levels)
-            var (trimmed, _, _) = TrimProcessWorkingSets();
+            var (trimmed, _, _, _) = TrimProcessWorkingSets();
             processesTrimmed = trimmed;
             methodsUsed.Add("Working Set Trim");
 
+            // Adaptive escalation: check if Conservative was enough
+            if (targetThresholdPercent > 0 && GetUsagePercentQuick() < targetThresholdPercent)
+            {
+                return BuildResult(sw, methodsUsed, beforeAvailable, processesTrimmed, actualLevel);
+            }
+
             if (level >= OptimizationLevel.Balanced)
             {
+                actualLevel = OptimizationLevel.Balanced;
+
                 // Step 2: Flush modified page list
                 if (FlushModifiedList())
                     methodsUsed.Add("Modified List Flush");
 
-                // Step 3: Two-phase — reset accessed bits so untouched pages become trim candidates
+                // Step 3: Reset accessed bits
                 if (CaptureAndResetAccessedBits())
                     methodsUsed.Add("Access Bits Reset");
 
-                // Step 4: Purge standby list (balanced = low-priority only, aggressive = all)
+                // Step 4: Purge standby (balanced = low-priority only)
                 if (level == OptimizationLevel.Balanced)
                 {
                     if (PurgeLowPriorityStandby())
                         methodsUsed.Add("Low-Priority Standby Purge");
-                }
-                else
-                {
-                    // Aggressive: system-wide working set empty + full standby purge
-                    if (EmptySystemWorkingSets())
-                        methodsUsed.Add("System Working Set Empty");
-                    if (PurgeStandbyList())
-                        methodsUsed.Add("Standby List Purge");
                 }
 
                 // Step 5: Flush system file cache
                 if (FlushSystemFileCache())
                     methodsUsed.Add("File Cache Flush");
 
-                // Step 6: Flush registry cache (dirty hives → disk)
+                // Step 6: Flush registry cache
                 if (FlushRegistryCache())
                     methodsUsed.Add("Registry Cache Flush");
 
-                // Step 7: Memory combining (merge identical pages)
+                // Step 7: Page combining
                 var pagesCombined = CombinePhysicalMemory();
                 if (pagesCombined > 0)
                     methodsUsed.Add($"Page Combine ({pagesCombined} pages)");
 
-                // Step 8: Apply hard file cache max if configured
+                // Step 8: File cache cap
                 if (cacheMaxPercent > 0)
                 {
                     var totalRam = (double)beforeInfo.TotalPhysicalBytes;
@@ -290,25 +295,26 @@ internal class MemoryOptimizer : IDisposable
                     if (SetFileCacheHardMax(maxCacheBytes))
                         methodsUsed.Add($"Cache Cap {cacheMaxPercent}%");
                 }
+
+                // Adaptive escalation: check if Balanced was enough
+                if (targetThresholdPercent > 0 && GetUsagePercentQuick() < targetThresholdPercent)
+                {
+                    return BuildResult(sw, methodsUsed, beforeAvailable, processesTrimmed, actualLevel);
+                }
+
+                // Aggressive-only steps
+                if (level >= OptimizationLevel.Aggressive)
+                {
+                    actualLevel = OptimizationLevel.Aggressive;
+
+                    if (EmptySystemWorkingSets())
+                        methodsUsed.Add("System Working Set Empty");
+                    if (PurgeStandbyList())
+                        methodsUsed.Add("Standby List Purge");
+                }
             }
 
-            sw.Stop();
-
-            var afterInfo = _memoryInfo.GetCurrentMemoryInfo();
-            var afterAvailable = (double)afterInfo.AvailablePhysicalBytes;
-            var freed = (long)(afterAvailable - beforeAvailable);
-
-            return new OptimizationResult
-            {
-                Timestamp = DateTime.Now,
-                MemoryBeforeMB = beforeAvailable / (1024 * 1024),
-                MemoryAfterMB = afterAvailable / (1024 * 1024),
-                MemoryFreedBytes = Math.Max(0, freed),
-                ProcessesTrimmed = processesTrimmed,
-                Duration = sw.Elapsed,
-                MethodsUsed = methodsUsed.ToArray(),
-                Success = true
-            };
+            return BuildResult(sw, methodsUsed, beforeAvailable, processesTrimmed, actualLevel);
         }
         catch (Exception ex)
         {
@@ -319,9 +325,54 @@ internal class MemoryOptimizer : IDisposable
                 Duration = sw.Elapsed,
                 Success = false,
                 ErrorMessage = ex.Message,
-                MethodsUsed = methodsUsed.ToArray()
+                MethodsUsed = methodsUsed.ToArray(),
+                ActualLevelUsed = actualLevel
             };
         }
+    }
+
+    private OptimizationResult BuildResult(
+        Stopwatch sw, List<string> methodsUsed,
+        double beforeAvailable, int processesTrimmed,
+        OptimizationLevel actualLevel)
+    {
+        sw.Stop();
+        var afterInfo = _memoryInfo.GetCurrentMemoryInfo();
+        var afterAvailable = (double)afterInfo.AvailablePhysicalBytes;
+        var freed = (long)(afterAvailable - beforeAvailable);
+
+        return new OptimizationResult
+        {
+            Timestamp = DateTime.Now,
+            MemoryBeforeMB = beforeAvailable / (1024 * 1024),
+            MemoryAfterMB = afterAvailable / (1024 * 1024),
+            MemoryFreedBytes = Math.Max(0, freed),
+            ProcessesTrimmed = processesTrimmed,
+            Duration = sw.Elapsed,
+            MethodsUsed = methodsUsed.ToArray(),
+            Success = true,
+            ActualLevelUsed = actualLevel
+        };
+    }
+
+    private static ulong GetAvailablePhysicalBytesQuick()
+    {
+        var ms = new NativeMethods.MEMORYSTATUSEX
+        {
+            dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MEMORYSTATUSEX>()
+        };
+        NativeMethods.GlobalMemoryStatusEx(ref ms);
+        return ms.ullAvailPhys;
+    }
+
+    private static int GetUsagePercentQuick()
+    {
+        var ms = new NativeMethods.MEMORYSTATUSEX
+        {
+            dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MEMORYSTATUSEX>()
+        };
+        NativeMethods.GlobalMemoryStatusEx(ref ms);
+        return (int)ms.dwMemoryLoad;
     }
 
     public void Dispose()

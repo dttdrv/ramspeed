@@ -101,7 +101,7 @@ internal class MemoryMonitor : IDisposable
         Interlocked.Increment(ref _optimizationInProgress);
         try
         {
-            var result = _optimizer.OptimizeAll(levelOverride ?? Level, CacheMaxPercent);
+            var result = _optimizer.OptimizeAll(levelOverride ?? Level, CacheMaxPercent, ThresholdPercent, IsLowMemory);
             _lastOptimization = DateTime.Now;
             OptimizationCompleted?.Invoke(result);
 
