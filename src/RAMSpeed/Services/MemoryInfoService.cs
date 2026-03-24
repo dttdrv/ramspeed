@@ -15,7 +15,7 @@ internal class MemoryInfoService : IDisposable
     private bool _perfCountersAvailable;
     private bool _disposed;
     private ulong _cachedCompressedBytes;
-    private DateTime _compressedCacheExpiry;
+    private DateTime _compressedCacheExpiry = DateTime.UtcNow.AddSeconds(30);
 
     public MemoryInfoService()
     {
