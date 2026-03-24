@@ -11,7 +11,6 @@ public class ProcessMemoryInfo : ViewModelBase
     public int Pid { get; set; }
     public string Name { get; set; } = string.Empty;
     public long WorkingSetBytes { get; set; }
-    public long PrivateBytes { get; set; }
 
     public bool IsExcluded
     {
@@ -34,5 +33,4 @@ public class ProcessMemoryInfo : ViewModelBase
     }
 
     public double WorkingSetMB => WorkingSetBytes / (1024.0 * 1024);
-    public double PrivateMB => PrivateBytes / (1024.0 * 1024);
 }

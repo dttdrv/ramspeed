@@ -457,7 +457,6 @@ public class MainViewModel : ViewModelBase
                             Pid = proc.Id,
                             Name = proc.ProcessName,
                             WorkingSetBytes = proc.WorkingSet64,
-                            PrivateBytes = proc.PrivateMemorySize64,
                             IsExcluded = excludedSet.Contains(proc.ProcessName)
                         });
                     }
