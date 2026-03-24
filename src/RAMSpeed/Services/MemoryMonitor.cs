@@ -185,7 +185,9 @@ internal class MemoryMonitor : IDisposable
                 if (predicted >= ThresholdPercent)
                 {
                     RunOptimization();
-                    _armed = false;
+                    // Only disarm if usage is still above the re-arm threshold after optimization
+                    if (LastMemoryInfo.UsagePercent >= (ThresholdPercent - HysteresisGap))
+                        _armed = false;
                     return;
                 }
             }
@@ -195,7 +197,10 @@ internal class MemoryMonitor : IDisposable
         if (IsLowMemory || (_armed && LastMemoryInfo.UsagePercent >= ThresholdPercent))
         {
             RunOptimization();
-            _armed = false;
+            // Only disarm if usage is still above the re-arm threshold after optimization
+            // If optimization freed enough memory, stay armed for the next breach
+            if (LastMemoryInfo.UsagePercent >= (ThresholdPercent - HysteresisGap))
+                _armed = false;
         }
     }
 
