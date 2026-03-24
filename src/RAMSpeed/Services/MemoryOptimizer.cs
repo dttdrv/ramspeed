@@ -294,7 +294,28 @@ internal class MemoryOptimizer : IDisposable
                 return BuildResult(sw, methodsUsed, beforeAvailable, processesTrimmed, actualLevel);
             }
 
-            if (level >= OptimizationLevel.Balanced)
+            // Compressed memory awareness: adjust effective level based on OS compression activity
+            var effectiveLevel = level;
+            if (targetThresholdPercent > 0)
+            {
+                var currentInfo = _memoryInfo.GetCurrentMemoryInfo();
+                double compressedRatio = currentInfo.TotalPhysicalBytes > 0
+                    ? (double)currentInfo.CompressedBytes / currentInfo.TotalPhysicalBytes
+                    : 0;
+
+                if (compressedRatio > 0.15 && effectiveLevel == OptimizationLevel.Aggressive)
+                {
+                    effectiveLevel = OptimizationLevel.Balanced;
+                    methodsUsed.Add("Level capped (high compression)");
+                }
+                else if (compressedRatio < 0.05 && isLowMemory && effectiveLevel < OptimizationLevel.Balanced)
+                {
+                    effectiveLevel = OptimizationLevel.Balanced;
+                    methodsUsed.Add("Level raised (low compression + low memory)");
+                }
+            }
+
+            if (effectiveLevel >= OptimizationLevel.Balanced)
             {
                 actualLevel = OptimizationLevel.Balanced;
 
@@ -309,7 +330,7 @@ internal class MemoryOptimizer : IDisposable
                     Thread.Sleep(accessedBitsDelayMs);
 
                 // Step 5: Purge standby — pages not re-accessed during delay are truly idle
-                if (level == OptimizationLevel.Balanced)
+                if (effectiveLevel == OptimizationLevel.Balanced)
                 {
                     RunTrackedStep("Low-Priority Standby Purge", PurgeLowPriorityStandby, methodsUsed, effectivenessTrackingEnabled);
                 }
@@ -341,7 +362,7 @@ internal class MemoryOptimizer : IDisposable
                 }
 
                 // Aggressive-only steps
-                if (level >= OptimizationLevel.Aggressive)
+                if (effectiveLevel >= OptimizationLevel.Aggressive)
                 {
                     actualLevel = OptimizationLevel.Aggressive;
 
