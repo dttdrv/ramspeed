@@ -17,6 +17,7 @@ internal sealed class TrayIconService : IDisposable
     private MenuItem? _autoOptimizeItem;
     private bool _disposed;
     private double _lastUsagePercent;
+    private int _lastRenderedPercent = -1;
 
     public event Action? OptimizeRequested;
     public event Action? ToggleAutoOptimizeRequested;
@@ -103,6 +104,10 @@ internal sealed class TrayIconService : IDisposable
     {
         if (_taskbarIcon == null) return;
 
+        int truncated = (int)usagePercent;
+        if (truncated == _lastRenderedPercent) return;
+        _lastRenderedPercent = truncated;
+
         try
         {
             var newIcon = RenderPercentageIcon(usagePercent);
@@ -121,6 +126,8 @@ internal sealed class TrayIconService : IDisposable
 
     private void OnTaskbarThemeChanged()
     {
+        _lastRenderedPercent = -1; // force re-render with new theme colors
+
         // Theme change events can fire on background threads — marshal to UI thread
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
         if (dispatcher != null && !dispatcher.CheckAccess())
