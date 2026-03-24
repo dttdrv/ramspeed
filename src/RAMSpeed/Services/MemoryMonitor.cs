@@ -15,7 +15,6 @@ internal class MemoryMonitor : IDisposable
     private bool _threadOptimized;
     private int _optimizationInProgress;
     private bool _disposed;
-    private bool _armed = true;
     private readonly Queue<(DateTime time, double usage)> _usageHistory = new();
 
     // Memory resource notification handles
@@ -171,12 +170,8 @@ internal class MemoryMonitor : IDisposable
         if ((DateTime.Now - _lastOptimization).TotalSeconds < CooldownSeconds)
             return;
 
-        // Hysteresis: re-arm when usage drops below threshold minus gap
-        if (!_armed && LastMemoryInfo.UsagePercent < (ThresholdPercent - HysteresisGap))
-            _armed = true;
-
         // Predictive trigger: if slope predicts threshold breach within lead time
-        if (_armed && !IsLowMemory && LastMemoryInfo.UsagePercent < ThresholdPercent)
+        if (!IsLowMemory && LastMemoryInfo.UsagePercent < ThresholdPercent)
         {
             double slope = ComputeUsageTrend();
             if (slope > 0)
@@ -185,22 +180,15 @@ internal class MemoryMonitor : IDisposable
                 if (predicted >= ThresholdPercent)
                 {
                     RunOptimization();
-                    // Only disarm if usage is still above the re-arm threshold after optimization
-                    if (LastMemoryInfo.UsagePercent >= (ThresholdPercent - HysteresisGap))
-                        _armed = false;
                     return;
                 }
             }
         }
 
-        // Auto-optimize: OS low-memory always fires; threshold requires armed state
-        if (IsLowMemory || (_armed && LastMemoryInfo.UsagePercent >= ThresholdPercent))
+        // Auto-optimize: fires every time usage >= threshold, gated only by cooldown
+        if (IsLowMemory || LastMemoryInfo.UsagePercent >= ThresholdPercent)
         {
             RunOptimization();
-            // Only disarm if usage is still above the re-arm threshold after optimization
-            // If optimization freed enough memory, stay armed for the next breach
-            if (LastMemoryInfo.UsagePercent >= (ThresholdPercent - HysteresisGap))
-                _armed = false;
         }
     }
 
