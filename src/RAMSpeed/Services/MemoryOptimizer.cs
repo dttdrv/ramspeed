@@ -23,11 +23,11 @@ internal class MemoryOptimizer : IDisposable
     {
         ThrowIfDisposed();
 
-        // Protect foreground app and self from trimming
         int foregroundPid = NativeMethods.GetForegroundProcessId();
         int selfPid = Environment.ProcessId;
 
-        int trimmed = 0, failed = 0, skipped = 0;
+        int skipped = 0;
+        var processInfos = new List<(int pid, long workingSet)>();
         foreach (var proc in Process.GetProcesses())
         {
             try
@@ -40,9 +40,31 @@ internal class MemoryOptimizer : IDisposable
                     continue;
                 }
 
+                processInfos.Add((proc.Id, proc.WorkingSet64));
+            }
+            catch
+            {
+                skipped++;
+            }
+            finally
+            {
+                proc.Dispose();
+            }
+        }
+
+        // Sort by working set descending — trim biggest consumers first
+        processInfos.Sort((a, b) => b.workingSet.CompareTo(a.workingSet));
+
+        int trimmed = 0, failed = 0;
+        bool earlyExit = false;
+
+        foreach (var (pid, workingSet) in processInfos)
+        {
+            try
+            {
                 var handle = NativeMethods.OpenProcess(
                     NativeMethods.PROCESS_QUERY_INFORMATION | NativeMethods.PROCESS_SET_QUOTA,
-                    false, proc.Id);
+                    false, pid);
 
                 if (handle == IntPtr.Zero)
                 {
@@ -61,18 +83,24 @@ internal class MemoryOptimizer : IDisposable
                 {
                     NativeMethods.CloseHandle(handle);
                 }
+
+                // Early exit check every 10 successful trims
+                if (targetAvailableBytes > 0 && trimmed > 0 && trimmed % 10 == 0)
+                {
+                    if ((long)GetAvailablePhysicalBytesQuick() >= targetAvailableBytes)
+                    {
+                        earlyExit = true;
+                        break;
+                    }
+                }
             }
             catch
             {
                 failed++;
             }
-            finally
-            {
-                proc.Dispose();
-            }
         }
 
-        return (trimmed, failed, skipped, false);
+        return (trimmed, failed, skipped, earlyExit);
     }
 
     public bool PurgeStandbyList()
@@ -244,10 +272,17 @@ internal class MemoryOptimizer : IDisposable
 
         try
         {
+            // Compute early-exit target for sorted trimming
+            long trimTarget = 0;
+            if (targetThresholdPercent > 0 && beforeInfo.TotalPhysicalBytes > 0)
+            {
+                trimTarget = (long)((double)beforeInfo.TotalPhysicalBytes * (1.0 - targetThresholdPercent / 100.0));
+            }
+
             // Step 1: Trim process working sets (all levels)
-            var (trimmed, _, _, _) = TrimProcessWorkingSets();
+            var (trimmed, _, _, earlyExit) = TrimProcessWorkingSets(trimTarget);
             processesTrimmed = trimmed;
-            methodsUsed.Add("Working Set Trim");
+            methodsUsed.Add(earlyExit ? "Working Set Trim (early exit)" : "Working Set Trim");
 
             // Adaptive escalation: check if Conservative was enough
             if (targetThresholdPercent > 0 && GetUsagePercentQuick() < targetThresholdPercent)
