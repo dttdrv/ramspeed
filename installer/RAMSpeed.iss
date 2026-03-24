@@ -5,10 +5,12 @@
 ;   iscc installer\RAMSpeed.iss          (run from project root)
 ;
 ; Prerequisites:
-;   dotnet publish -c Release -r win-x64 --self-contained false -o publish
+;   dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true \
+;     -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true \
+;     -p:DebugType=embedded -o portable/
 
 #define AppName    "RAMSpeed"
-#define AppVer     "1.0"
+#define AppVer     "1.0.3"
 #define AppExe     "RAMSpeed.exe"
 
 [Setup]
@@ -19,9 +21,12 @@ AppPublisher={#AppName}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
-OutputDir=..\dist
-OutputBaseFilename={#AppName}_Setup_{#AppVer}
-Compression=lzma2
+OutputDir=output
+OutputBaseFilename={#AppName}-Setup-{#AppVer}
+Compression=lzma2/ultra64
+MinVersion=10.0
+CloseApplications=force
+CloseApplicationsFilter=RAMSpeed.exe
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
@@ -29,7 +34,6 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName} — Memory Optimizer
 SetupIconFile=..\src\RAMSpeed\Resources\app.ico
-LicenseFile=
 ; No license dialog — skip straight to install
 
 [Languages]
@@ -40,12 +44,13 @@ Name: "desktopicon";  Description: "Create a &desktop shortcut"; Flags: unchecke
 Name: "startonboot";  Description: "Start RAMSpeed &automatically when Windows starts"
 
 [Files]
-Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\src\RAMSpeed\Resources\app.ico"; DestDir: "{app}"; Flags: ignoreversion
+; Self-contained single-file exe (71 MB, .NET runtime bundled)
+Source: "..\portable\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#AppName}";         Filename: "{app}\{#AppExe}"; IconFilename: "{app}\app.ico"
-Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\app.ico"; Tasks: desktopicon
+Name: "{group}\{#AppName}";         Filename: "{app}\{#AppExe}"
+Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
+Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
 ; Register the silent-elevation task without a logon trigger
@@ -68,3 +73,15 @@ Filename: "schtasks.exe"; Parameters: "/Delete /TN ""{#AppName}"" /F"; \
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
+; Clean up user settings
+Type: filesandordirs; Name: "{userappdata}\RAMSpeed"
+
+[Code]
+function InitializeSetup(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  // Kill running instance before install/upgrade
+  Exec('taskkill.exe', '/F /IM RAMSpeed.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := True;
+end;

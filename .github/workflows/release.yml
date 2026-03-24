@@ -1,0 +1,82 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish self-contained exe
+        run: |
+          dotnet publish src/RAMSpeed/RAMSpeed.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=embedded `
+            -o portable/
+
+      - name: Build installer
+        run: |
+          choco install innosetup --yes --no-progress
+          iscc installer/RAMSpeed.iss
+
+      - name: Upload unsigned artifacts
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-artifacts
+          path: |
+            portable/RAMSpeed.exe
+            installer/output/RAMSpeed-Setup-*.exe
+
+      # SignPath signing step — uncomment after SignPath.io setup
+      # - name: Sign artifacts
+      #   uses: signpath/github-action-submit-signing-request@v2
+      #   with:
+      #     api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+      #     organization-id: '${{ secrets.SIGNPATH_ORG_ID }}'
+      #     project-slug: 'ramspeed'
+      #     signing-policy-slug: 'release-signing'
+      #     github-artifact-id: '${{ steps.upload-unsigned.outputs.artifact-id }}'
+      #     wait-for-completion: true
+      #     output-artifact-directory: 'signed/'
+
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            portable/RAMSpeed.exe
+            installer/output/RAMSpeed-Setup-*.exe
+          body: |
+            ## RAMSpeed ${{ steps.version.outputs.version }}
+
+            **Downloads:**
+            - `RAMSpeed-Setup-*.exe` — Installer (recommended)
+            - `RAMSpeed.exe` — Portable single-file executable
+
+            Requires Windows 10 or later. .NET runtime is bundled.
+            Run as administrator for full optimization features.

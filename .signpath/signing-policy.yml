@@ -1,0 +1,21 @@
+# SignPath signing policy for RAMSpeed
+# This file is read by SignPath.io during the CI/CD signing step.
+# Setup instructions:
+#   1. Go to https://signpath.org/ and apply for a free OSS certificate
+#   2. Create an organization and project at https://app.signpath.io
+#   3. Install the SignPath GitHub App on your repo
+#   4. Add SIGNPATH_API_TOKEN and SIGNPATH_ORG_ID as GitHub repo secrets
+#   5. Uncomment the signing step in .github/workflows/release.yml
+
+# Signing configuration
+artifact-configuration:
+  name: RAMSpeed
+  signing-steps:
+    - name: Sign executables
+      file-elements:
+        - type: pe
+          include:
+            - "**/*.exe"
+          signing-attributes:
+            description: "RAMSpeed Memory Optimizer"
+            description-url: "https://github.com/dttdrv/ramspeed"
