@@ -141,7 +141,7 @@ internal class MemoryMonitor : IDisposable
 
         if (LastMemoryInfo != null)
         {
-            _usageHistory.Enqueue((DateTime.UtcNow, LastMemoryInfo.UsagePercent));
+            _usageHistory.Enqueue((_utcNow(), LastMemoryInfo.UsagePercent));
             while (_usageHistory.Count > TrendWindowSize)
                 _usageHistory.Dequeue();
         }
