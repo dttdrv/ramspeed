@@ -42,8 +42,6 @@ public partial class MainWindow : FluentWindow
                 Top = settings.WindowTop;
             }
 
-            InitializeTrayIcon();
-
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 // Apply read-only mode from App if non-admin
@@ -51,6 +49,7 @@ public partial class MainWindow : FluentWindow
                 if (app?.IsReadOnlyMode == true)
                     _vm.IsReadOnlyMode = true;
 
+                InitializeTrayIcon(); // deferred after first paint (GDI icon rendering ~200ms)
                 _vm.Initialize();
                 if (_vm.LastMemoryInfo != null)
                     _tray?.UpdateTooltip(_vm.LastMemoryInfo);

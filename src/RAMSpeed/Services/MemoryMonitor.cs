@@ -76,7 +76,7 @@ internal class MemoryMonitor : IDisposable
         _timer.Start();
         // Immediately fire first update
         RefreshMemoryInfo();
-        MaybeTrimSelf(SelfTrimReason.Startup);
+        Task.Run(() => MaybeTrimSelf(SelfTrimReason.Startup)); // off UI thread
         _memoryInfoService.WarmUpAsync(); // fire-and-forget background warm-up
     }
 
@@ -128,7 +128,7 @@ internal class MemoryMonitor : IDisposable
 
     private void OnTimerTick(object? sender, EventArgs e)
     {
-        if (_disposed)
+        if (_disposed || IsOptimizing)
             return;
 
         // Apply per-thread optimizations once (on the dispatcher thread — the timer thread)
@@ -158,7 +158,7 @@ internal class MemoryMonitor : IDisposable
         {
             if ((DateTime.Now - _lastOptimization).TotalMinutes >= ScheduledOptimizeIntervalMinutes)
             {
-                RunOptimization();
+                Task.Run(() => RunOptimization());
                 return;
             }
         }
@@ -179,7 +179,7 @@ internal class MemoryMonitor : IDisposable
                 double predicted = LastMemoryInfo.UsagePercent + slope * PredictiveLeadSeconds;
                 if (predicted >= ThresholdPercent)
                 {
-                    RunOptimization();
+                    Task.Run(() => RunOptimization());
                     return;
                 }
             }
@@ -188,7 +188,7 @@ internal class MemoryMonitor : IDisposable
         // Auto-optimize: fires every time usage >= threshold, gated only by cooldown
         if (IsLowMemory || LastMemoryInfo.UsagePercent >= ThresholdPercent)
         {
-            RunOptimization();
+            Task.Run(() => RunOptimization());
         }
     }
 

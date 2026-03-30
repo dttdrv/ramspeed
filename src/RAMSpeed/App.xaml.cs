@@ -25,7 +25,7 @@ public partial class App : Application
     /// <summary>True when running without admin — optimization disabled, monitoring only.</summary>
     internal bool IsReadOnlyMode { get; private set; }
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         // Show any unhandled exceptions instead of silently dying
         DispatcherUnhandledException += (s, args) =>
@@ -85,10 +85,14 @@ public partial class App : Application
         if (!IsRunningAsAdmin())
         {
             // Try the scheduled task first (silent elevation, no UAC prompt)
-            if (TaskSchedulerHelper.TaskExists() && TaskSchedulerHelper.RunTask())
+            // Run off the UI thread to avoid blocking startup for up to 10 seconds
+            bool elevated = await Task.Run(() =>
+                TaskSchedulerHelper.TaskExists() && TaskSchedulerHelper.RunTask());
+
+            if (elevated)
             {
                 // Give the elevated instance a moment to start before we release the mutex
-                Thread.Sleep(500);
+                await Task.Delay(500);
                 Shutdown();
                 return;
             }

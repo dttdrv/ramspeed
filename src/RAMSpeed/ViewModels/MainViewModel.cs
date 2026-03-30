@@ -530,6 +530,23 @@ public class MainViewModel : ViewModelBase
                 TotalFreedMB += result.FreedMB;
                 OptimizationCount++;
             }
+
+            // Show feedback for auto-optimizations (manual already handles its own via OptimizeNow)
+            if (!IsOptimizing)
+            {
+                StatusText = result.Success
+                    ? $"Auto-optimized: freed {result.FreedMB:F1} MB"
+                    : $"Auto-optimize failed: {result.ErrorMessage}";
+
+                LastOptimizationResult = result;
+                ShowOptimizationResult = true;
+                _resultDismissTimer?.Stop();
+                _resultDismissTimer?.Dispose();
+                _resultDismissTimer = new System.Timers.Timer(5000) { AutoReset = false };
+                _resultDismissTimer.Elapsed += (_, _) =>
+                    Application.Current?.Dispatcher.Invoke(() => ShowOptimizationResult = false);
+                _resultDismissTimer.Start();
+            }
         });
     }
 
