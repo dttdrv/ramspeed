@@ -1,9 +1,9 @@
-"""Generate RAMSpeed app icon (.ico) — minimalistic, premium, Windows 11-style."""
+"""Generate optiRAM app icon (.ico) — minimalistic, premium, Windows 11-style."""
 from PIL import Image, ImageDraw
 import os
 
 SIZES = [16, 24, 32, 48, 64, 128, 256]
-OUT = os.path.join(os.path.dirname(__file__), "..", "src", "RAMSpeed", "Resources", "app.ico")
+OUT = os.path.join(os.path.dirname(__file__), "..", "src", "optiRAM", "Resources", "app.ico")
 
 # Design: Clean rounded-square with an abstract memory gauge.
 # A vertical bar inside a rounded rectangle, partially filled — represents RAM usage.

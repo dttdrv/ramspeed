@@ -1,10 +1,10 @@
-# RAMSpeed
+# optiRAM
 
 A lightweight, high-performance Windows memory optimizer. Reclaims wasted RAM in real time using native Windows memory management APIs.
 
 ## What it does
 
-RAMSpeed monitors your system's memory usage and automatically frees RAM when pressure is detected. It uses the same low-level Windows APIs that built-in tools like RAMMap use — working set trimming, standby list management, page deduplication, and file cache control — but does it automatically and intelligently.
+optiRAM monitors your system's memory usage and automatically frees RAM when pressure is detected. It uses the same low-level Windows APIs that built-in tools like RAMMap use — working set trimming, standby list management, page deduplication, and file cache control — but does it automatically and intelligently.
 
 ### Optimization pipeline
 
@@ -34,8 +34,8 @@ RAMSpeed monitors your system's memory usage and automatically frees RAM when pr
 
 Get the latest release from the [Releases](https://github.com/dttdrv/ramspeed/releases) page:
 
-- **RAMSpeed-Setup.exe** — Installer (recommended). Handles elevation, Start Menu shortcuts, startup registration, and clean uninstall.
-- **RAMSpeed.exe** — Portable single-file executable. No installation required.
+- **optiRAM-Setup.exe** — Installer (recommended). Handles elevation, Start Menu shortcuts, startup registration, and clean uninstall.
+- **optiRAM.exe** — Portable single-file executable. No installation required.
 
 ## Requirements
 
@@ -46,7 +46,7 @@ The .NET runtime is bundled — no separate installation needed.
 
 ## Configuration
 
-Settings are stored in `%APPDATA%\RAMSpeed\settings.json`. The UI exposes the most common options. Advanced settings available in the JSON file:
+Settings are stored in `%APPDATA%\optiRAM\settings.json`. The UI exposes the most common options. Advanced settings available in the JSON file:
 
 | Setting | Default | Description |
 |---|---|---|
@@ -61,13 +61,13 @@ Settings are stored in `%APPDATA%\RAMSpeed\settings.json`. The UI exposes the mo
 ## Building from source
 
 ```
-dotnet build src/RAMSpeed/RAMSpeed.csproj
+dotnet build src/optiRAM/optiRAM.csproj
 ```
 
 ### Publish portable exe
 
 ```
-dotnet publish src/RAMSpeed/RAMSpeed.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o portable/
+dotnet publish src/optiRAM/optiRAM.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o portable/
 ```
 
 ### Build installer
@@ -75,13 +75,13 @@ dotnet publish src/RAMSpeed/RAMSpeed.csproj -c Release -r win-x64 --self-contain
 Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php).
 
 ```
-iscc installer/RAMSpeed.iss
+iscc installer/optiRAM.iss
 ```
 
 ### Run tests
 
 ```
-dotnet test tests/RAMSpeed.Tests/RAMSpeed.Tests.csproj
+dotnet test tests/optiRAM.Tests/optiRAM.Tests.csproj
 ```
 
 ## License

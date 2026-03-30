@@ -21,7 +21,7 @@ jobs:
 
       - name: Publish self-contained exe
         run: |
-          dotnet publish src/RAMSpeed/RAMSpeed.csproj `
+          dotnet publish src/optiRAM/optiRAM.csproj `
             -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
@@ -32,7 +32,7 @@ jobs:
       - name: Build installer
         run: |
           choco install innosetup --yes --no-progress
-          iscc installer/RAMSpeed.iss
+          iscc installer/optiRAM.iss
 
       - name: Get version from tag
         id: version
@@ -47,14 +47,14 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            portable/RAMSpeed.exe
-            installer/output/RAMSpeed-Setup-*.exe
+            portable/optiRAM.exe
+            installer/output/optiRAM-Setup-*.exe
           body: |
-            ## RAMSpeed ${{ steps.version.outputs.version }}
+            ## optiRAM ${{ steps.version.outputs.version }}
 
             **Downloads:**
-            - `RAMSpeed-Setup-*.exe` — Installer (recommended)
-            - `RAMSpeed.exe` — Portable single-file executable
+            - `optiRAM-Setup-*.exe` — Installer (recommended)
+            - `optiRAM.exe` — Portable single-file executable
 
             Requires Windows 10 or later. .NET runtime is bundled.
             Run as administrator for full optimization features.
