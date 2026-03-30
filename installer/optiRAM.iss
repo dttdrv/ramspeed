@@ -10,7 +10,7 @@
 ;     -p:DebugType=embedded -o portable/
 
 #define AppName    "optiRAM"
-#define AppVer     "2.0.1"
+#define AppVer     "3.0.0"
 #define AppExe     "optiRAM.exe"
 
 [Setup]
@@ -26,7 +26,7 @@ OutputBaseFilename={#AppName}-Setup-{#AppVer}
 Compression=lzma2/ultra64
 MinVersion=10.0
 CloseApplications=force
-CloseApplicationsFilter=optiRAM.exe
+CloseApplicationsFilter=optiRAM.exe,RAMSpeed.exe
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
@@ -64,12 +64,16 @@ Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; \
   Flags: postinstall nowait skipifsilent shellexec
 
 [UninstallRun]
-; Stop the app
+; Stop the app (both new and legacy names)
 Filename: "taskkill"; Parameters: "/F /IM {#AppExe}"; \
   Flags: runhidden waituntilterminated; RunOnceId: "TerminateApp"
-; Remove the scheduled task
+Filename: "taskkill"; Parameters: "/F /IM RAMSpeed.exe"; \
+  Flags: runhidden waituntilterminated; RunOnceId: "TerminateLegacyApp"
+; Remove scheduled tasks (both new and legacy names)
 Filename: "schtasks.exe"; Parameters: "/Delete /TN ""{#AppName}"" /F"; \
   Flags: runhidden waituntilterminated; RunOnceId: "RemoveTask"
+Filename: "schtasks.exe"; Parameters: "/Delete /TN ""RAMSpeed"" /F"; \
+  Flags: runhidden waituntilterminated; RunOnceId: "RemoveLegacyTask"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
@@ -81,7 +85,10 @@ function InitializeSetup(): Boolean;
 var
   ResultCode: Integer;
 begin
-  // Kill running instance before install/upgrade
+  // Kill running instance before install/upgrade (both new and legacy names)
   Exec('taskkill.exe', '/F /IM optiRAM.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('taskkill.exe', '/F /IM RAMSpeed.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // Clean up the legacy scheduled task so it doesn't relaunch the old binary
+  Exec('schtasks.exe', '/Delete /TN "RAMSpeed" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := True;
 end;
