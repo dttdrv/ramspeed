@@ -13,10 +13,10 @@ internal static class TaskSchedulerHelper
     private const string TaskName = "optiRAM";
     private const string LegacyTaskName = "RAMSpeed";
 
-    /// <summary>Check whether the scheduled task exists (checks both new and legacy task names).</summary>
+    /// <summary>Check whether the scheduled task exists (only checks the current "optiRAM" task).</summary>
     public static bool TaskExists()
     {
-        return TaskExistsByName(TaskName) || TaskExistsByName(LegacyTaskName);
+        return TaskExistsByName(TaskName);
     }
 
     private static bool TaskExistsByName(string taskName)
@@ -40,10 +40,10 @@ internal static class TaskSchedulerHelper
         catch { return false; }
     }
 
-    /// <summary>Run the app via the scheduled task (tries new name, then legacy).</summary>
+    /// <summary>Run the app via the scheduled task (only uses the current "optiRAM" task).</summary>
     public static bool RunTask()
     {
-        return RunTaskByName(TaskName) || RunTaskByName(LegacyTaskName);
+        return RunTaskByName(TaskName);
     }
 
     private static bool RunTaskByName(string taskName)
