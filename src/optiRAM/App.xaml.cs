@@ -25,7 +25,7 @@ public partial class App : Application
     /// <summary>True when running without admin — optimization disabled, monitoring only.</summary>
     internal bool IsReadOnlyMode { get; private set; }
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         // Show any unhandled exceptions instead of silently dying
         DispatcherUnhandledException += (s, args) =>
@@ -81,18 +81,15 @@ public partial class App : Application
 
         _activationService = new SingleInstanceActivationService(ActivationSignalName, OnActivationSignal);
 
-        // Admin check — try silent elevation via scheduled task, then UAC, then read-only
+        // Admin check — try silent elevation via scheduled task, then UAC, then read-only.
+        // This MUST be synchronous: if we await here, WPF creates MainWindow before we
+        // can call Shutdown(), causing a visible window flash before the elevated instance takes over.
         if (!IsRunningAsAdmin())
         {
-            // Try the scheduled task first (silent elevation, no UAC prompt)
-            // Run off the UI thread to avoid blocking startup for up to 10 seconds
-            bool elevated = await Task.Run(() =>
-                TaskSchedulerHelper.TaskExists() && TaskSchedulerHelper.RunTask());
-
-            if (elevated)
+            if (TaskSchedulerHelper.TaskExists() && TaskSchedulerHelper.RunTask())
             {
                 // Give the elevated instance a moment to start before we release the mutex
-                await Task.Delay(500);
+                Thread.Sleep(500);
                 Shutdown();
                 return;
             }
